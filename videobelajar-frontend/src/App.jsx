@@ -8,7 +8,7 @@ import * as apiService from "./services/api";
 const defaultAvatar = "https://unsplash.com";
 
 function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState("login");
   const [courses, setCourses] = useState([]);
 
   // State Profil User Tunggal

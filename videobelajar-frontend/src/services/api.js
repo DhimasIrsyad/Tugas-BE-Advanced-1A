@@ -9,9 +9,9 @@ const api = axios.create({
   },
 });
 
-// GET: Mengambil data dari endpoint /course lokal
-export const getCourses = async () => {
-  const response = await api.get("/course");
+// GET: Mengambil data dari endpoint /course lokal (Sudah Mendukung Query Params untuk Search, Sort, & Filter)
+export const getCourses = async (params) => {
+  const response = await api.get("/course", { params }); // <-- Perubahan krusial di baris ini
   return response.data;
 };
 
@@ -30,6 +30,18 @@ export const updateCourse = async (id, courseData) => {
 // DELETE: Menghapus data dari endpoint /course/:id lokal
 export const deleteCourse = async (id) => {
   const response = await api.delete(`/course/${id}`);
+  return response.data;
+};
+
+// POST: Mendaftarkan User Baru ke endpoint /register lokal
+export const registerUser = async (userData) => {
+  const response = await api.post("/register", userData);
+  return response.data;
+};
+
+// POST: Login User ke endpoint /login lokal
+export const loginUser = async (credentials) => {
+  const response = await api.post("/login", credentials);
   return response.data;
 };
 

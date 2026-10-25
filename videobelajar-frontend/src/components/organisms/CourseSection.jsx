@@ -6,7 +6,12 @@ import CategoryTabs from "../molecules/CategoryTabs";
 import CourseCard from "../molecules/CourseCard";
 import Button from "../atoms/Button";
 import { listKategori } from "../../constants/courseMockData";
-import * as apiService from "../../services/api";
+import {
+  getCourses,
+  addCourse,
+  updateCourse,
+  deleteCourse,
+} from "../../services/api";
 
 // Import Redux Actions dari store
 import {
@@ -19,8 +24,11 @@ import {
 const CourseSection = ({ isAdminMode, currentUser }) => {
   const dispatch = useDispatch();
 
-  // 1. Tampilkan data menggunakan useSelector untuk mengambil dari state Redux
+  // 1. Ambil data menggunakan useSelector dari state Redux
   const courses = useSelector((state) => state.courses.list);
+
+  // 2. State untuk mendeteksi kategori horizontal aktif yang diklik
+  const [activeCategory, setActiveCategory] = useState("Semua Kelas");
 
   const [courseInput, setCourseInput] = useState({
     title: "",
@@ -29,62 +37,102 @@ const CourseSection = ({ isAdminMode, currentUser }) => {
   });
   const [editId, setEditId] = useState(null);
 
-  // Ambil data API (GET) saat komponen dimuat
+  // 3. Fungsi pengambil data membawa params filter kategori ke database
   const fetchAllCourses = async () => {
     try {
-      const data = await apiService.getCourses();
-      dispatch(setCourses(data)); // Simpan ke Redux
+      const params = {};
+
+      // Jika kategori aktif bukan "Semua Kelas", kirim nama kategorinya ke Back-End.
+      if (activeCategory !== "Semua Kelas" && activeCategory !== "") {
+        params.instructor = activeCategory;
+      }
+
+      const data = await getCourses(params);
+      dispatch(setCourses(data)); // Masukkan hasil filter database ke Redux global
     } catch (error) {
       console.error("Gagal memuat kursus dari API:", error);
     }
   };
 
+  // Memicu penembakan ulang data dari database Laragon setiap kali user mengeklik tab kategori baru
   useEffect(() => {
     fetchAllCourses();
-  }, []);
+  }, [activeCategory]);
 
-  // Handler untuk ADD dan EDIT
+  // Handler untuk ADD dan EDIT (Sudah Diperbaiki Agar Sinkron Kolom Category Database)
+  // Handler untuk ADD dan EDIT (Versi Kebal Eror Format Data)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!courseInput.title.trim()) return;
 
     try {
+      // Membersihkan format harga (mengubah "Rp 145.000" menjadi angka murni 145000 jika diperlukan)
+      // Langkah ini memastikan database Laragon tidak menolak kiriman data dari form
+      const cleanPrice = courseInput.price.replace(/[^0-9]/g, "");
+      const finalPrice = cleanPrice
+        ? `Rp ${parseInt(cleanPrice).toLocaleString("id-ID")}`
+        : "Rp 145.000";
+
       if (editId !== null) {
-        // Integrasi EDIT
-        const savedCourse = await apiService.updateCourse(editId, courseInput);
+        // 1. JALUR INTEGRASI EDIT
+        const currentCourse = courses.find((c) => c.id === editId);
+        const payloadEdit = {
+          title: courseInput.title,
+          desc: courseInput.desc,
+          price: finalPrice,
+          instructor: currentCourse?.instructor || "Jenna Ortega",
+          category:
+            currentCourse?.category ||
+            (activeCategory !== "Semua Kelas" ? activeCategory : "Pemasaran"),
+        };
+
+        // Memanggil fungsi updateCourse instan (pastikan nama tanpa kata apiService jika sudah diubah kurung kurawal)
+        const savedCourse = await updateCourse(editId, payloadEdit);
         dispatch(updateCourseInState(savedCourse));
         setEditId(null);
+        alert("Kursus berhasil diperbarui di database!");
       } else {
-        // Integrasi ADD
-        const payload = {
+        // 2. JALUR INTEGRASI ADD
+        const payloadAdd = {
+          title: courseInput.title,
+          desc: courseInput.desc,
+          price: finalPrice,
           image: "https://unsplash.com",
           avatar: "https://unsplash.com",
-          instructor: currentUser?.name || "Jenna Ortega",
+          instructor: "Jenna Ortega",
           role: "Senior Instructor",
           rating: "5.0 (1)",
-          price: "Rp 150.000",
-          ...courseInput,
+          category:
+            activeCategory !== "Semua Kelas" ? activeCategory : "Pemasaran",
         };
-        const savedCourse = await apiService.addCourse(payload);
+
+        // Memanggil fungsi addCourse instan
+        const savedCourse = await addCourse(payloadAdd);
         dispatch(addCourseToState(savedCourse));
+        alert("Kursus baru berhasil masuk ke database Laragon!");
       }
+
+      // Mengembalikan inputan form ke kondisi awal yang bersih
       setCourseInput({ title: "", desc: "", price: "Rp 145.000" });
     } catch (error) {
-      console.error("Aksi CRUD gagal:", error);
+      console.error("Aksi CRUD gagal dideteksi di browser:", error);
+      alert("Aksi CRUD gagal! Periksa koneksi jembatan API Anda.");
     }
   };
 
   // Integrasi DELETE
   const handleDeleteCourse = async (idToDelete) => {
     const konfirmasi = window.confirm(
-      "Apakah Anda yakin ingin menghapus kelas ini secara permanen dari API?",
+      "Apakah Anda yakin ingin menghapus kelas ini secara permanen dari database Laragon?",
     );
     if (konfirmasi) {
       try {
-        await apiService.deleteCourse(idToDelete);
+        await deleteCourse(idToDelete);
         dispatch(deleteCourseFromState(idToDelete)); // Hapus dari Redux global
+        alert("Kursus berhasil dihapus secara permanen!");
       } catch (error) {
         console.error("Gagal menghapus kursus:", error);
+        alert("Gagal menghapus! Cek koneksi server Anda.");
       }
     }
   };
@@ -96,7 +144,12 @@ const CourseSection = ({ isAdminMode, currentUser }) => {
         Jelajahi Dunia Pengetahuan Melalui Video Kami
       </TextDescription>
 
-      <CategoryTabs categories={listKategori} />
+      {/* Sambungkan state activeCategory dan fungsi pengubahnya ke komponen Kategori */}
+      <CategoryTabs
+        categories={listKategori}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+      />
 
       {/* FORM INPUT CRUD */}
       {isAdminMode && (
@@ -106,8 +159,8 @@ const CourseSection = ({ isAdminMode, currentUser }) => {
         >
           <h4 className="text-xs font-bold text-green-600 uppercase tracking-wider">
             {editId !== null
-              ? "📝 Edit Data Kursus via Redux"
-              : "✨ Tambah Kursus Baru via Redux"}
+              ? "📝 Edit Data Kursus via Redux & DB"
+              : "✨ Tambah Kursus Baru via Redux & DB"}
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">

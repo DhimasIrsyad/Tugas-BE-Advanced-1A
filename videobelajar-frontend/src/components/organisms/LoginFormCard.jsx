@@ -1,14 +1,53 @@
-import React from "react";
+import React, { useState } from "react";
 import Heading from "../atoms/Heading";
 import TextDescription from "../atoms/TextDescription";
 import Button from "../atoms/Button";
 import InputField from "../molecules/InputField";
 import logoGoogle from "../../assets/brands/logo-google.png";
+import { loginUser } from "../../services/api"; // 1. Impor fungsi API login
 
 const LoginFormCard = ({ onNavigate }) => {
-  const handleLoginSubmit = (e) => {
+  // 2. Siapkan state untuk menampung input email dan password
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // 3. Modifikasi fungsi submit agar melakukan verifikasi ke Back-End terlebih dahulu
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    onNavigate("home");
+
+    try {
+      // Mengirim data kredensial ke server Node.js port 8080
+      const responseData = await loginUser({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // 4. Menyimpan Token JWT & data user ke dalam penyimpanan lokal browser (localStorage)
+      localStorage.setItem("token", responseData.token);
+      localStorage.setItem("user", JSON.stringify(responseData.user));
+
+      alert("Login berhasil! Selamat datang kembali.");
+
+      // Mengarahkan user ke halaman utama sesuai jalur asli Anda jika lolos verifikasi
+      onNavigate("home");
+    } catch (error) {
+      console.error("Gagal login:", error);
+      // Menampilkan pesan pop-up error jika email atau password tidak cocok di database
+      alert(
+        error.response?.data?.message ||
+          "Email atau password yang Anda masukkan salah!",
+      );
+    }
   };
 
   return (
@@ -27,13 +66,19 @@ const LoginFormCard = ({ onNavigate }) => {
         <InputField
           label="E-Mail"
           type="email"
+          name="email" // Tambahan atribut name wajib
           placeholder="contoh@email.com"
+          value={formData.email} // Sinkronisasi value dengan state
+          onChange={handleChange} // Handler ketikan keyboard
           required
         />
         <InputField
           label="Kata Sandi"
           type="password"
+          name="password" // Tambahan atribut name wajib
           placeholder="••••••••"
+          value={formData.password} // Sinkronisasi value dengan state
+          onChange={handleChange} // Handler ketikan keyboard
           required
         />
 

@@ -5,6 +5,7 @@ import Button from "../atoms/Button";
 import InputField from "../molecules/InputField";
 import logoGoogle from "../../assets/brands/logo-google.png";
 import flagId from "../../assets/brands/flag-id.png";
+import { registerUser } from "../../services/api"; // 1. Impor fungsi API yang kita buat tadi
 
 const RegisterFormCard = ({
   onNavigate,
@@ -12,10 +13,13 @@ const RegisterFormCard = ({
   onUpdateProfile,
   isProfileMode = false,
 }) => {
+  // 2. Sesuaikan state formData agar memiliki field yang sama dengan kebutuhan database
   const [formData, setFormData] = useState({
-    name: isProfileMode ? currentUser.name : "",
+    fullname: isProfileMode ? currentUser.name : "",
+    username: isProfileMode ? currentUser.username : "",
     email: isProfileMode ? currentUser.email : "",
-    phone: isProfileMode ? currentUser.phone : "",
+    password: "",
+    confirmPassword: "",
   });
 
   const handleChange = (e) => {
@@ -26,13 +30,42 @@ const RegisterFormCard = ({
     }));
   };
 
-  const handleFormSubmit = (e) => {
+  // 3. Modifikasi fungsi submit agar menembak data ke Back-End Node.js
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
+
     if (isProfileMode) {
       onUpdateProfile(formData);
       alert("Profil berhasil diperbarui!");
     } else {
-      onNavigate("login");
+      // Validasi kecocokan password di sisi Front-End terlebih dahulu
+      if (formData.password !== formData.confirmPassword) {
+        alert("Kata sandi dan konfirmasi kata sandi tidak cocok!");
+        return;
+      }
+
+      try {
+        // Kirim data ke port 8080 database Laragon lewat helper API
+        const payload = {
+          fullname: formData.fullname,
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        };
+
+        await registerUser(payload);
+
+        alert(
+          "Pendaftaran Sukses! Silakan cek email simulasi Anda untuk verifikasi.",
+        );
+        onNavigate("login"); // Pindah ke halaman login setelah berhasil tersimpan di DB
+      } catch (error) {
+        console.error("Gagal mendaftar:", error);
+        alert(
+          error.response?.data?.message ||
+            "Terjadi kesalahan saat mendaftar akun.",
+        );
+      }
     }
   };
 
@@ -40,7 +73,6 @@ const RegisterFormCard = ({
     <div
       className={`bg-white rounded-2xl border border-gray-100 w-full text-center font-sans flex flex-col items-center ${isProfileMode ? "p-6 md:p-8 border-none md:border md:shadow-sm" : "p-6 md:p-8 shadow-sm max-w-[400px]"}`}
     >
-      {/* KONDISI 1: JIKA MODE PROFIL, TAMPILKAN HEADER AVATAR DI ATAS FORM */}
       {isProfileMode ? (
         <div className="flex items-center gap-4 border-b border-gray-100 pb-6 mb-6 w-full text-left">
           <div className="w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-50 shrink-0">
@@ -64,7 +96,6 @@ const RegisterFormCard = ({
           </div>
         </div>
       ) : (
-        /* KONDISI 2: JIKA MODE REGISTER, TAMPILKAN JUDUL BAWAAN */
         <>
           <Heading className="!text-center !w-full text-gray-950 text-xl md:text-2xl font-bold mb-0.5 block">
             Pendaftaran Akun
@@ -79,18 +110,28 @@ const RegisterFormCard = ({
         onSubmit={handleFormSubmit}
         className="w-full flex flex-col text-left"
       >
-        {/* Layout Grid dinamis: 3 kolom sejajar di PC saat mode profil, bertumpuk 1 kolom saat registrasi */}
         <div
           className={`grid grid-cols-1 gap-x-4 ${isProfileMode ? "md:grid-cols-3" : ""}`}
         >
           <InputField
             label="Nama Lengkap"
-            name="name"
+            name="fullname"
             placeholder="Nama Anda"
-            value={formData.name}
+            value={formData.fullname}
             onChange={handleChange}
             required
           />
+
+          {!isProfileMode && (
+            <InputField
+              label="Username"
+              name="username"
+              placeholder="username_anda"
+              value={formData.username}
+              onChange={handleChange}
+              required
+            />
+          )}
 
           <InputField
             label="E-Mail"
@@ -102,44 +143,24 @@ const RegisterFormCard = ({
             required
           />
 
-          <InputField
-            label="No. HP"
-            name="phone"
-            placeholder="812345678"
-            value={formData.phone}
-            onChange={(e) => {
-              const safeValue = e.target.value.replace(/[^0-9]/g, "");
-              setFormData((prev) => ({ ...prev, phone: safeValue }));
-            }}
-            required
-          >
-            <div className="flex items-center shrink-0 border-r border-gray-200 pr-2 mr-1 h-5 select-none">
-              <img
-                src={flagId}
-                alt="ID"
-                className="w-4 h-3 object-contain mr-1.5"
-              />
-              <select
-                className="appearance-none bg-transparent text-xs font-semibold text-gray-800 focus:outline-none cursor-pointer pr-1"
-                defaultValue="+62"
-              >
-                <option value="+62">+62</option>
-              </select>
-            </div>
-          </InputField>
-
           {!isProfileMode && (
             <>
               <InputField
                 label="Kata Sandi"
                 type="password"
+                name="password"
                 placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
                 required
               />
               <InputField
                 label="Konfirmasi Kata Sandi"
                 type="password"
+                name="confirmPassword"
                 placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={handleChange}
                 required
               />
             </>
